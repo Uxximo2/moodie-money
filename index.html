@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1041,11 +1042,10 @@ function selectEmoji(e){
 async function fetchPrice(ticker){
   if(!ticker)return null;
   try{
-    const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
-      {headers:{Accept:'application/json'}});
+    const r=await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
     if(!r.ok)return null;
     const d=await r.json();
-    return d?.chart?.result?.[0]?.meta?.regularMarketPrice??null;
+    return d?.price??null;
   }catch{return null}
 }
 
@@ -1289,8 +1289,8 @@ function deleteWatch(){
 async function refreshMarket(){
   document.getElementById('mktTime').textContent='시장 데이터 불러오는 중…';
   try{
-    const r=await fetch('https://open.er-api.com/v6/latest/USD');
-    if(r.ok){const d=await r.json();const krw=d.rates?.KRW;
+    const r=await fetch('/api/fx');
+    if(r.ok){const d=await r.json();const krw=d.krw;
       if(krw){fxRate=krw;document.getElementById('m-fx').textContent=krw.toFixed(1);
         document.getElementById('mc-fx').textContent='₩/USD';document.getElementById('mc-fx').className='mkt-chg mkt-flat';}}
   }catch{}
@@ -1299,15 +1299,14 @@ async function refreshMarket(){
   let loaded=0;
   for(const idx of indices){
     try{
-      const r=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(idx.sym)}?interval=1d&range=1d`,
-        {headers:{Accept:'application/json'}});
-      if(r.ok){const d=await r.json();const meta=d?.chart?.result?.[0]?.meta;
-        if(meta){const price=meta.regularMarketPrice,prev=meta.chartPreviousClose||meta.previousClose;
-          const chg=prev?((price-prev)/prev*100):0;
+      const r=await fetch(`/api/quote?symbol=${encodeURIComponent(idx.sym)}`);
+      if(r.ok){const d=await r.json();
+        if(d.price!=null){const price=d.price,chg=d.change??0;
           const vEl=document.getElementById(idx.v),cEl=document.getElementById(idx.c);
           if(vEl)vEl.textContent=price>=1000?price.toLocaleString('en',{maximumFractionDigits:0}):price.toFixed(2);
           if(cEl){cEl.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';
-            cEl.className='mkt-chg '+(chg>0?'mkt-up':chg<0?'mkt-dn':'mkt-flat');}loaded++;}}
+            cEl.className='mkt-chg '+(chg>0?'mkt-up':chg<0?'mkt-dn':'mkt-flat');}loaded++;
+        }}
     }catch{}
   }
   const now=new Date();
