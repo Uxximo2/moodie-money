@@ -14,6 +14,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="아껴쓰자">
 <link rel="apple-touch-icon" href="/icon-192.png">
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
 <style>
@@ -642,40 +647,101 @@ const EXP_COLORS=['#FF3B3018','#FF950018','#34C75918','#007AFF18','#30D15818',
   '#0071E318','#FF3A5C18','#32ADE618','#5E5CE618','#30B0C718'];
 
 // ═══════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════
+let db=null,fbAuth=null,currentUID=null,_unsubData=null,_saveTimer=null;
+
+async function initFirebase(){
+  try{
+    const r=await fetch('/api/config');
+    const cfg=await r.json();
+    if(!cfg.apiKey) throw new Error('no config');
+    firebase.initializeApp(cfg);
+    fbAuth=firebase.auth();
+    db=firebase.firestore();
+    fbAuth.onAuthStateChanged(user=>{
+      if(user){
+        currentUID=user.uid;
+        listenToUserData(user.uid);
+      } else {
+        currentUID=null;
+        if(_unsubData){_unsubData();_unsubData=null;}
+        loadLocalData();
+        render();
+        if(curPage==='settings') renderSettings();
+      }
+    });
+  } catch(e){
+    console.log('Firebase fallback:',e.message);
+    loadLocalData(); render();
+  }
+}
+
+function listenToUserData(uid){
+  if(_unsubData) _unsubData();
+  _unsubData=db.collection('users').doc(uid).onSnapshot(doc=>{
+    if(doc.exists){
+      const d=doc.data();
+      transactions=d.transactions||[];
+      portfolio   =d.portfolio||[];
+      watchlist   =d.watchlist||[];
+      incCats     =d.incCats||JSON.parse(JSON.stringify(DEF_INCOME));
+      expCats     =d.expCats||JSON.parse(JSON.stringify(DEF_EXPENSE));
+    } else {
+      loadLocalData();
+      saveToFirestore();
+    }
+    render();
+    if(curPage==='port'){renderPortfolio();renderWatchlist();}
+    if(curPage==='settings') renderSettings();
+  });
+}
+
+async function saveToFirestore(){
+  if(!db||!currentUID) return;
+  try{
+    await db.collection('users').doc(currentUID).set({
+      transactions,portfolio,watchlist,incCats,expCats,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch(e){console.error('Firestore save:',e);}
+}
+
+function scheduleSave(){
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(saveToFirestore,600);
+}
+
+// ═══════════════════════════════════════════
 // USER / AUTH
 // ═══════════════════════════════════════════
-function getUsers(){return JSON.parse(localStorage.getItem('mm_users')||'[]')}
-function saveUsers(u){localStorage.setItem('mm_users',JSON.stringify(u))}
-function getCurrentUser(){return localStorage.getItem('mm_currentUser')||null}
+function getCurrentUser(){
+  if(fbAuth?.currentUser) return fbAuth.currentUser.email.replace('@akkeuseuja.app','');
+  return localStorage.getItem('mm_currentUser')||null;
+}
 function setCurrentUser(u){u?localStorage.setItem('mm_currentUser',u):localStorage.removeItem('mm_currentUser')}
-
-function hashPw(s){
-  // Simple deterministic obfuscation (not cryptographic — prototype only)
-  let h=0;
-  for(let i=0;i<s.length;i++){h=(Math.imul(31,h)+s.charCodeAt(i))|0}
-  return h.toString(36);
-}
-
-function uKey(k){
-  const u=getCurrentUser();
-  return u?`mm_${k}_${u}`:`mm_${k}`;
-}
+function hashPw(s){let h=0;for(let i=0;i<s.length;i++){h=(Math.imul(31,h)+s.charCodeAt(i))|0}return h.toString(36)}
+function uKey(k){const u=getCurrentUser();return u?`mm_${k}_${u}`:`mm_${k}`}
 
 // ═══════════════════════════════════════════
 // STORAGE
 // ═══════════════════════════════════════════
 function ls(k,def){try{const v=localStorage.getItem(uKey(k));return v?JSON.parse(v):def}catch{return def}}
-function ss(k,v){localStorage.setItem(uKey(k),JSON.stringify(v))}
+function ss(k,v){
+  localStorage.setItem(uKey(k),JSON.stringify(v));
+  if(db&&currentUID) scheduleSave();
+}
 
 let transactions,portfolio,watchlist,incCats,expCats;
-function loadUserData(){
+function loadLocalData(){
   transactions=ls('tx',[]);
   portfolio   =ls('port',[]);
   watchlist   =ls('watch',[]);
   incCats     =ls('inc',JSON.parse(JSON.stringify(DEF_INCOME)));
   expCats     =ls('exp',JSON.parse(JSON.stringify(DEF_EXPENSE)));
 }
-loadUserData();
+function loadUserData(){loadLocalData();}
+loadLocalData();
 
 // ═══════════════════════════════════════════
 // STATE
@@ -1400,32 +1466,46 @@ function switchLoginTab(tab){
   document.getElementById('signupForm').style.display=tab==='signup'?'':'none';
 }
 
-function doLogin(){
+async function doLogin(){
   const user=document.getElementById('loginUser').value.trim();
   const pw=document.getElementById('loginPw').value;
   const err=document.getElementById('loginErr');
   if(!user||!pw){err.textContent='아이디와 비밀번호를 입력해주세요';return}
-  const users=getUsers();
-  const found=users.find(u=>u.username===user&&u.pw===hashPw(pw));
-  if(!found){err.textContent='아이디 또는 비밀번호가 틀렸어요';return}
-  setCurrentUser(user);loadUserData();renderSettings();render();
+  if(fbAuth){
+    try{
+      const email=`${user}@akkeuseuja.app`;
+      await fbAuth.signInWithEmailAndPassword(email,pw);
+      // onAuthStateChanged handles the rest
+    } catch(e){
+      if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential') err.textContent='아이디 또는 비밀번호가 틀렸어요';
+      else if(e.code==='auth/wrong-password') err.textContent='비밀번호가 틀렸어요';
+      else err.textContent='로그인 실패: '+e.message;
+    }
+  }
 }
 
-function doSignup(){
+async function doSignup(){
   const user=document.getElementById('signupUser').value.trim();
   const pw=document.getElementById('signupPw').value;
   const err=document.getElementById('signupErr');
   if(!user||!pw){err.textContent='아이디와 비밀번호를 입력해주세요';return}
   if(pw.length<4){err.textContent='비밀번호는 4자 이상이어야 해요';return}
-  const users=getUsers();
-  if(users.find(u=>u.username===user)){err.textContent='이미 사용중인 아이디예요';return}
-  users.push({username:user,pw:hashPw(pw),createdAt:Date.now()});
-  saveUsers(users);setCurrentUser(user);loadUserData();renderSettings();render();
+  if(fbAuth){
+    try{
+      const email=`${user}@akkeuseuja.app`;
+      await fbAuth.createUserWithEmailAndPassword(email,pw);
+      // onAuthStateChanged handles the rest
+    } catch(e){
+      if(e.code==='auth/email-already-in-use') err.textContent='이미 사용중인 아이디예요';
+      else err.textContent='가입 실패: '+e.message;
+    }
+  }
 }
 
-function logout(){
+async function logout(){
   if(!confirm('로그아웃 할까요?'))return;
-  setCurrentUser(null);loadUserData();renderSettings();render();
+  if(fbAuth) await fbAuth.signOut();
+  setCurrentUser(null);loadLocalData();renderSettings();render();
 }
 
 // ═══════════════════════════════════════════
@@ -1527,6 +1607,7 @@ function bgClose(e,id){if(e.target===document.getElementById(id))closeOv(id)}
 // INIT
 // ═══════════════════════════════════════════
 render();
+initFirebase();
 
 // Register service worker for PWA
 if('serviceWorker' in navigator){
