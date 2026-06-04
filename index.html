@@ -309,6 +309,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
 .card-sum-chip.has-txs .csc-amt{color:#FF6B6B}
 .csc-cnt{font-size:10px;color:var(--label)}
 .card-sum-chip.has-txs .csc-cnt{color:rgba(255,255,255,.5)}
+
+/* PORTFOLIO GROUPS */
+.port-total-card{margin:10px 16px 6px;background:#1C1C1E;border-radius:var(--r);padding:16px;color:#fff}
+.port-total-label{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:3px}
+.port-total-amt{font-size:26px;font-weight:700;letter-spacing:-.5px;cursor:pointer}
+.port-total-pct{font-size:13px;font-weight:600;margin-top:2px}
+.port-total-toggle{background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:6px;
+  padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px}
+.group-section{margin:0 16px 10px}
+.group-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px}
+.group-hdr-left{display:flex;align-items:center;gap:8px}
+.group-name{font-size:16px;font-weight:700}
+.group-rename-btn{background:var(--bg);border:0.5px solid var(--sep);border-radius:6px;
+  padding:3px 8px;font-size:11px;color:var(--label);cursor:pointer;font-family:inherit}
+.group-return{background:var(--bg);border-radius:6px;padding:4px 10px;cursor:pointer;text-align:right}
+.group-return-amt{font-size:13px;font-weight:600}
+.group-add-btn{width:26px;height:26px;background:var(--blue);border:none;border-radius:50%;
+  color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.group-stocks{background:var(--card);border-radius:var(--r);overflow:hidden;
+  box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.new-group-card{margin:0 16px 16px;border:1.5px dashed var(--sep);border-radius:var(--r);
+  padding:14px;display:flex;align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;color:var(--label);background:transparent}
+.new-group-card:active{background:var(--bg)}
+.edit-stock-btn{background:var(--bg);border:0.5px solid var(--sep);border-radius:6px;
+  padding:3px 8px;font-size:11px;color:var(--label);cursor:pointer;font-family:inherit;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -345,6 +371,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
     <button class="seg-btn active" id="segInc" onclick="switchSeg('income')">📥 수입</button>
     <button class="seg-btn" id="segExp" onclick="switchSeg('expense')">📤 지출</button>
   </div>
+  <!-- CARD SUMMARY (위로 이동) -->
+  <div style="padding:14px 20px 6px;font-size:16px;font-weight:700;color:var(--label)">카드별 지출</div>
+  <div style="display:flex;gap:9px;padding:0 16px;overflow-x:auto;padding-bottom:4px" id="cardSummaryRow"></div>
+
   <div id="panelIncome">
     <div class="sec-row"><span class="sec-hdr">수입</span><button class="quick-add-btn" onclick="openQuickCatAdd('income')">＋</button></div>
     <div class="cat-grid" id="gridIncome"></div>
@@ -353,9 +383,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
     <div class="sec-row"><span class="sec-hdr">지출</span><button class="quick-add-btn" onclick="openQuickCatAdd('expense')">＋</button></div>
     <div class="cat-grid" id="gridExpense"></div>
   </div>
-  <!-- CARD SUMMARY -->
-  <div style="padding:18px 20px 10px;font-size:20px;font-weight:700">지출</div>
-  <div style="display:flex;gap:9px;padding:0 16px;overflow-x:auto;padding-bottom:4px" id="cardSummaryRow"></div>
 
   <div style="display:flex;justify-content:space-between;align-items:baseline;padding:18px 20px 10px">
     <span style="font-size:20px;font-weight:700">최근 내역</span>
@@ -381,15 +408,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
       <div class="mkt-tile"><div class="mkt-name">KOSDAQ</div><div class="mkt-val" id="m-kq">--</div><div class="mkt-chg mkt-flat" id="mc-kq">--</div></div>
     </div>
   </div>
-  <div class="port-card">
-    <div class="port-hdr-row"><h3>보유 종목</h3><button class="add-btn" onclick="openStockModal()">+ 추가</button></div>
-    <div class="port-summary">
-      <div class="port-sum-item"><div class="ps-label">총 투자금</div><div class="ps-val" id="portTotalCost">₩0</div></div>
-      <div class="port-sum-item"><div class="ps-label">총 평가금</div><div class="ps-val" id="portTotalVal">₩0</div></div>
-      <div class="port-sum-item"><div class="ps-label">수익률</div><div class="ps-val" id="portRet">0%</div></div>
-    </div>
-    <div id="stockList"></div>
-  </div>
+  <div id="portfolioContent"></div>
   <div class="port-card">
     <div class="port-hdr-row"><h3>관심 종목</h3><button class="add-btn" onclick="openWatchModal()">+ 추가</button></div>
     <div id="watchList"><div class="tx-empty">관심 종목을 추가해보세요 👀</div></div>
@@ -553,6 +572,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
   </div>
 </div>
 
+<!-- ── NEW GROUP MODAL ── -->
+<div class="overlay" id="newGroupOv" onclick="bgClose(event,'newGroupOv')">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-left"><span class="modal-icon-big">📁</span><span class="modal-title">새 그룹 만들기</span></div>
+      <button class="x-btn" onclick="closeOv('newGroupOv')">✕</button>
+    </div>
+    <div class="form-body">
+      <label class="f-label">그룹 이름</label>
+      <input class="f-input" id="newGroupName" placeholder="예: 토스증권, 하나증권, ISA">
+      <button class="sub-btn" onclick="submitNewGroup()">만들기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── RENAME GROUP MODAL ── -->
+<div class="overlay" id="renameGroupOv" onclick="bgClose(event,'renameGroupOv')">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-left"><span class="modal-icon-big">✏️</span><span class="modal-title">그룹 이름 변경</span></div>
+      <button class="x-btn" onclick="closeOv('renameGroupOv')">✕</button>
+    </div>
+    <div class="form-body">
+      <label class="f-label">새 이름</label>
+      <input class="f-input" id="renameGroupInput" placeholder="그룹 이름">
+      <button class="sub-btn" onclick="submitRenameGroup()">저장</button>
+    </div>
+    <button class="del-btn" onclick="deleteGroup()">그룹 삭제</button>
+  </div>
+</div>
+
 <!-- ── STOCK ADD MODAL ── -->
 <div class="overlay" id="stockOverlay" onclick="bgClose(event,'stockOverlay')">
   <div class="sheet">
@@ -573,6 +625,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
         <button class="chip sel" id="buyCurKRW" onclick="selectBuyCur('KRW')">₩ 원 (KRW)</button>
         <button class="chip" id="buyCurUSD" onclick="selectBuyCur('USD')">$ 달러 (USD)</button>
       </div>
+      <label class="f-label">그룹</label>
+      <div class="card-row" id="groupChipRow" style="flex-wrap:wrap"></div>
       <label class="f-label">매입 단가</label>
       <input class="f-input" id="stkBuy" type="number" placeholder="0" inputmode="decimal">
       <div id="stkPriceStatus" style="font-size:13px;color:var(--label);margin-top:10px;min-height:18px;text-align:center"></div>
@@ -687,6 +741,7 @@ function listenToUserData(uid){
       watchlist   =d.watchlist||[];
       incCats     =d.incCats||JSON.parse(JSON.stringify(DEF_INCOME));
       expCats     =d.expCats||JSON.parse(JSON.stringify(DEF_EXPENSE));
+      groups      =d.groups||[];
     } else {
       loadLocalData();
       saveToFirestore();
@@ -701,7 +756,7 @@ async function saveToFirestore(){
   if(!db||!currentUID) return;
   try{
     await db.collection('users').doc(currentUID).set({
-      transactions,portfolio,watchlist,incCats,expCats,
+      transactions,portfolio,watchlist,incCats,expCats,groups,
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     });
   } catch(e){console.error('Firestore save:',e);}
@@ -732,13 +787,14 @@ function ss(k,v){
   if(db&&currentUID) scheduleSave();
 }
 
-let transactions,portfolio,watchlist,incCats,expCats;
+let transactions,portfolio,watchlist,incCats,expCats,groups;
 function loadLocalData(){
   transactions=ls('tx',[]);
   portfolio   =ls('port',[]);
   watchlist   =ls('watch',[]);
   incCats     =ls('inc',JSON.parse(JSON.stringify(DEF_INCOME)));
   expCats     =ls('exp',JSON.parse(JSON.stringify(DEF_EXPENSE)));
+  groups      =ls('groups',[]);
 }
 function loadUserData(){loadLocalData();}
 loadLocalData();
@@ -754,6 +810,10 @@ let editingStockId=null,editingWatchId=null;
 let displayCurrency='KRW'; // 'KRW' | 'USD'
 let fxRate=1350;           // fallback USD→KRW rate, updated by refreshMarket
 let selBuyCur='KRW';       // currency selected in stock modal
+let portTotalCurrency='USD'; // top total card currency
+let groupCurrencies={};      // {groupId: 'USD'|'KRW'} per-group display
+let selGroupId=null;         // group selected in stock modal
+let editingGroupId=null;     // group being renamed/deleted
 
 // ═══════════════════════════════════════════
 // NAVIGATION
@@ -830,7 +890,15 @@ function render(){
   const exp=txs.filter(t=>!t.isInc).reduce((s,t)=>s+t.amount,0);
   document.getElementById('totInc').textContent=fmt(inc);
   document.getElementById('totExp').textContent=fmt(exp);
-  document.getElementById('balAmt').textContent=fmt(inc-exp);
+  const net=inc-exp;
+  const balEl=document.getElementById('balAmt');
+  const sign=net>=0?'+':'-';
+  if(displayCurrency==='USD'){
+    balEl.textContent=sign+'$'+(Math.abs(net)/fxRate).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  } else {
+    balEl.textContent=sign+'₩'+Math.round(Math.abs(net)).toLocaleString('ko-KR');
+  }
+  balEl.style.color=net>=0?'#30D158':'#FF453A';
   renderGrid('gridIncome',incCats,true);
   renderGrid('gridExpense',expCats,false);
   renderCardSummary();
@@ -1103,6 +1171,56 @@ function selectEmoji(e){
 }
 
 // ═══════════════════════════════════════════
+// PORTFOLIO GROUPS
+// ═══════════════════════════════════════════
+function openNewGroupModal(){
+  document.getElementById('newGroupName').value='';
+  openOv('newGroupOv');
+  setTimeout(()=>document.getElementById('newGroupName').focus(),350);
+}
+function submitNewGroup(){
+  const name=document.getElementById('newGroupName').value.trim();
+  if(!name)return;
+  groups.push({id:'g'+Date.now(),name});
+  ss('groups',groups);
+  closeOv('newGroupOv');
+  renderPortfolio();
+}
+function openRenameGroupModal(groupId){
+  editingGroupId=groupId;
+  const g=groups.find(x=>x.id===groupId);
+  document.getElementById('renameGroupInput').value=g?g.name:'';
+  openOv('renameGroupOv');
+  setTimeout(()=>document.getElementById('renameGroupInput').focus(),350);
+}
+function submitRenameGroup(){
+  const name=document.getElementById('renameGroupInput').value.trim();
+  if(!name)return;
+  const idx=groups.findIndex(x=>x.id===editingGroupId);
+  if(idx>=0) groups[idx].name=name;
+  ss('groups',groups);
+  closeOv('renameGroupOv');
+  renderPortfolio();
+}
+function deleteGroup(){
+  if(!confirm('그룹을 삭제할까요? 종목은 미분류로 이동돼요.'))return;
+  groups=groups.filter(x=>x.id!==editingGroupId);
+  portfolio.forEach(p=>{if(p.groupId===editingGroupId)p.groupId=null;});
+  ss('groups',groups); ss('port',portfolio);
+  closeOv('renameGroupOv');
+  renderPortfolio();
+}
+function togglePortTotalCurrency(){
+  portTotalCurrency=portTotalCurrency==='USD'?'KRW':'USD';
+  renderPortfolio();
+}
+function toggleGroupCurrency(groupId){
+  const cur=groupCurrencies[groupId]||'USD';
+  groupCurrencies[groupId]=cur==='USD'?'KRW':'USD';
+  renderPortfolio();
+}
+
+// ═══════════════════════════════════════════
 // PORTFOLIO
 // ═══════════════════════════════════════════
 async function fetchPrice(ticker){
@@ -1136,80 +1254,129 @@ function fmtNative(n, currency){
 }
 
 function renderPortfolio(){
-  // Separate USD and KRW holdings — never mix
-  const usd = portfolio.filter(p=>(p.buyCurrency||'KRW')==='USD');
-  const krw = portfolio.filter(p=>(p.buyCurrency||'KRW')==='KRW');
+  const container=document.getElementById('portfolioContent');
+  container.innerHTML='';
 
-  const usdCost = usd.reduce((s,p)=>s+p.qty*p.buy,0);
-  const usdVal  = usd.reduce((s,p)=>s+p.qty*(p.cur||p.buy),0);
-  const krwCost = krw.reduce((s,p)=>s+p.qty*p.buy,0);
-  const krwVal  = krw.reduce((s,p)=>s+p.qty*(p.cur||p.buy),0);
+  // ── Total earnings card ──
+  const allCostUSD=portfolio.filter(p=>(p.buyCurrency||'KRW')==='USD').reduce((s,p)=>s+p.qty*p.buy,0);
+  const allValUSD =portfolio.filter(p=>(p.buyCurrency||'KRW')==='USD').reduce((s,p)=>s+p.qty*(p.cur||p.buy),0);
+  const allCostKRW=portfolio.filter(p=>(p.buyCurrency||'KRW')==='KRW').reduce((s,p)=>s+p.qty*p.buy,0);
+  const allValKRW =portfolio.filter(p=>(p.buyCurrency||'KRW')==='KRW').reduce((s,p)=>s+p.qty*(p.cur||p.buy),0);
+  const totalCostKRWe=allCostKRW+allCostUSD*fxRate;
+  const totalValKRWe =allValKRW +allValUSD*fxRate;
+  const totalGainKRWe=totalValKRWe-totalCostKRWe;
+  const totalGainUSDe=(allValUSD-allCostUSD)+(allValKRW-allCostKRW)/fxRate;
+  const totalPcte=totalCostKRWe>0?(totalGainKRWe/totalCostKRWe*100):0;
+  const showTotalUSD=portTotalCurrency==='USD';
+  const totalGainAmt=showTotalUSD?totalGainUSDe:totalGainKRWe;
+  const totalGainStr=(totalGainAmt>=0?'+':'')+fmtNative(Math.abs(totalGainAmt),showTotalUSD?'USD':'KRW');
+  const totalGainColor=totalGainKRWe>=0?'#30D158':'#FF453A';
+  const totalCard=document.createElement('div');
+  totalCard.className='port-total-card';
+  totalCard.innerHTML=`
+    <div class="port-total-label">총 수익 (전체)</div>
+    <div class="port-total-amt" style="color:${totalGainColor}" onclick="togglePortTotalCurrency()">${totalGainStr}</div>
+    <div class="port-total-pct" style="color:${totalGainColor}">${totalPcte>=0?'+':''}${totalPcte.toFixed(2)}%</div>
+    <button class="port-total-toggle" onclick="togglePortTotalCurrency()">${showTotalUSD?'$ → ₩':'₩ → $'}</button>`;
+  container.appendChild(totalCard);
 
-  // Summary block — show USD and/or KRW separately
-  const sumEl = document.querySelector('.port-summary');
-  let sumHTML = '';
-  if(usd.length){
-    const uRet = usdCost>0?(usdVal-usdCost)/usdCost*100:0;
-    sumHTML += `
-      <div class="port-sum-item">
-        <div class="ps-label">투자금 (USD)</div>
-        <div class="ps-val">$${usdCost.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-      </div>
-      <div class="port-sum-item">
-        <div class="ps-label">평가금 (USD)</div>
-        <div class="ps-val">$${usdVal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-      </div>
-      <div class="port-sum-item">
-        <div class="ps-label">수익률 $</div>
-        <div class="ps-val" style="color:${uRet>=0?'var(--green)':'var(--red)'}">${uRet>=0?'+':''}${uRet.toFixed(2)}%</div>
-      </div>`;
-  }
-  if(krw.length){
-    const kRet = krwCost>0?(krwVal-krwCost)/krwCost*100:0;
-    sumHTML += `
-      <div class="port-sum-item">
-        <div class="ps-label">투자금 (KRW)</div>
-        <div class="ps-val">₩${Math.round(krwCost).toLocaleString('ko-KR')}</div>
-      </div>
-      <div class="port-sum-item">
-        <div class="ps-label">평가금 (KRW)</div>
-        <div class="ps-val">₩${Math.round(krwVal).toLocaleString('ko-KR')}</div>
-      </div>
-      <div class="port-sum-item">
-        <div class="ps-label">수익률 ₩</div>
-        <div class="ps-val" style="color:${kRet>=0?'var(--green)':'var(--red)'}">${kRet>=0?'+':''}${kRet.toFixed(2)}%</div>
-      </div>`;
-  }
-  if(!portfolio.length) sumHTML=`<div class="port-sum-item" style="grid-column:span 3"><div class="ps-label" style="text-align:center">종목을 추가하면 요약이 표시돼요</div></div>`;
-  sumEl.innerHTML = sumHTML;
-
-  // Hide legacy single-total elements if they exist
-  ['portTotalCost','portTotalVal','portRet'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none'});
-
-  const list=document.getElementById('stockList');
-  if(!portfolio.length){list.innerHTML='<div class="tx-empty">종목을 추가해보세요 📊</div>';return}
-  list.innerHTML='';
+  // ── Build group map ──
+  const grouped={};
   portfolio.forEach(p=>{
-    const bc=p.buyCurrency||'KRW';
-    const cur=p.cur||p.buy;
-    const cost=p.qty*p.buy, val=p.qty*cur;
-    const r=cost>0?(val-cost)/cost*100:0;
-    const d=document.createElement('div');d.className='stock-item';d.id='stock-row-'+p.id;
-    const totalVal = p.qty * cur;
-    const gainLoss = totalVal - cost;
-    const ts=p.updatedAt?`<span style="font-size:10px;color:var(--label)">${p.updatedAt}</span>`
-      :`<span style="font-size:10px;color:var(--orange)">로딩중…</span>`;
-    d.innerHTML=`<div class="stock-ico">${stockLogoHtml(p.ticker,p.name)}</div>
-      <div class="stock-info"><div class="stock-name">${p.name}</div>
-      <div class="stock-sub">${p.ticker?p.ticker+' · ':''} ${p.qty}주 · 주당 ${fmtNative(cur,bc)}</div>
-      ${ts}</div>
-      <div class="stock-right">
-        <div class="stock-val" id="sv-${p.id}">${fmtNative(totalVal,bc)}</div>
-        <div class="stock-ret ${r>=0?'ret-pos':'ret-neg'}" id="sr-${p.id}">${gainLoss>=0?'+':''}${fmtNative(gainLoss,bc)} (${r>=0?'+':''}${r.toFixed(2)}%)</div>
-      </div>`;
-    d.onclick=()=>openStockDetail(p.id);
-    list.appendChild(d);
+    const gid=p.groupId||'__none__';
+    if(!grouped[gid]) grouped[gid]=[];
+    grouped[gid].push(p);
   });
+
+  const renderGroup=(g,stocks)=>{
+    const sec=document.createElement('div');
+    sec.className='group-section';
+    const gid=g.id;
+    const defaultCur=stocks[0]?.buyCurrency||'USD';
+    if(!groupCurrencies[gid]) groupCurrencies[gid]=defaultCur;
+    const gc=groupCurrencies[gid];
+    const gCost=stocks.reduce((s,p)=>s+p.qty*p.buy,0);
+    const gVal =stocks.reduce((s,p)=>s+p.qty*(p.cur||p.buy),0);
+    const gGain=gVal-gCost;
+    const gPct =gCost>0?(gGain/gCost*100):0;
+    const gc2=gGain>=0?'#34C759':'#FF3B30';
+    const gStr=(gGain>=0?'+':'')+fmtNative(Math.abs(gGain),gc);
+    const hdr=document.createElement('div');
+    hdr.className='group-hdr';
+    hdr.innerHTML=`
+      <div class="group-hdr-left">
+        <span class="group-name">${g.name}</span>
+        ${gid!=='__none__'?`<button class="group-rename-btn" onclick="openRenameGroupModal('${gid}')">이름 변경</button>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="group-return" onclick="toggleGroupCurrency('${gid}')">
+          <div class="group-return-amt" style="color:${gc2}">${gStr}</div>
+          <div style="font-size:10px;color:${gc2}">${gPct>=0?'+':''}${gPct.toFixed(2)}% · 탭하면 ${gc==='USD'?'₩':'$'}</div>
+        </div>
+        <button class="group-add-btn" onclick="openStockModal(null,'${gid}')">+</button>
+      </div>`;
+    sec.appendChild(hdr);
+    const stockList=document.createElement('div');
+    stockList.className='group-stocks';
+    stocks.forEach(p=>{
+      const bc=p.buyCurrency||'KRW';
+      const cur=p.cur||p.buy;
+      const cost=p.qty*p.buy, val=p.qty*cur, gain=val-cost;
+      const r=cost>0?(val-cost)/cost*100:0;
+      const d=document.createElement('div');
+      d.className='stock-item';
+      const ts=p.updatedAt?`<span style="font-size:10px;color:var(--label)">${p.updatedAt}</span>`
+        :`<span style="font-size:10px;color:var(--orange)">로딩중…</span>`;
+      d.innerHTML=`<div class="stock-ico">${stockLogoHtml(p.ticker,p.name)}</div>
+        <div class="stock-info">
+          <div class="stock-name">${p.name}</div>
+          <div class="stock-sub">${p.ticker?p.ticker+' · ':''} ${p.qty}주 · 주당 ${fmtNative(cur,bc)}</div>
+          ${ts}
+        </div>
+        <div class="stock-right">
+          <div class="stock-val" id="sv-${p.id}">${fmtNative(val,bc)}</div>
+          <div class="stock-ret ${r>=0?'ret-pos':'ret-neg'}" id="sr-${p.id}">${gain>=0?'+':''}${fmtNative(Math.abs(gain),bc)} (${r>=0?'+':''}${r.toFixed(2)}%)</div>
+        </div>
+        <button class="edit-stock-btn" onclick="event.stopPropagation();openStockModal('${p.id}')">편집</button>`;
+      d.onclick=()=>openStockDetail(p.id);
+      stockList.appendChild(d);
+    });
+    sec.appendChild(stockList);
+    container.appendChild(sec);
+  };
+
+  // Named groups (with or without stocks)
+  groups.forEach(g=>{
+    const stocks=grouped[g.id]||[];
+    if(stocks.length){
+      renderGroup(g,stocks);
+    } else {
+      const sec=document.createElement('div');
+      sec.className='group-section';
+      sec.innerHTML=`<div class="group-hdr">
+        <div class="group-hdr-left">
+          <span class="group-name">${g.name}</span>
+          <button class="group-rename-btn" onclick="openRenameGroupModal('${g.id}')">이름 변경</button>
+        </div>
+        <button class="group-add-btn" onclick="openStockModal(null,'${g.id}')">+</button>
+      </div>
+      <div style="background:var(--card);border-radius:var(--r);padding:16px;text-align:center;color:var(--label);font-size:14px">종목을 추가해보세요 📊</div>`;
+      container.appendChild(sec);
+    }
+  });
+  if(grouped['__none__']?.length) renderGroup({id:'__none__',name:'미분류'},grouped['__none__']);
+  if(!portfolio.length && !groups.length){
+    const empty=document.createElement('div');
+    empty.style.cssText='margin:0 16px;background:var(--card);border-radius:var(--r);padding:32px;text-align:center;color:var(--label);font-size:14px';
+    empty.textContent='그룹을 만들고 종목을 추가해보세요 📊';
+    container.appendChild(empty);
+  }
+
+  const newGroupBtn=document.createElement('div');
+  newGroupBtn.className='new-group-card';
+  newGroupBtn.innerHTML=`<div style="width:22px;height:22px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px">+</div><span style="font-size:14px">새 그룹 만들기</span>`;
+  newGroupBtn.onclick=openNewGroupModal;
+  container.appendChild(newGroupBtn);
 }
 
 async function refreshAllPrices(){
@@ -1243,7 +1410,7 @@ function selectBuyCur(cur){
   document.getElementById('buyCurUSD').classList.toggle('sel',cur==='USD');
 }
 
-function openStockModal(id){
+function openStockModal(id, preGroupId){
   editingStockId=id||null;
   const s=id?portfolio.find(p=>p.id===id):null;
   document.getElementById('stkTitle').textContent=s?'종목 수정':'종목 추가';
@@ -1254,6 +1421,16 @@ function openStockModal(id){
   document.getElementById('stkPriceStatus').textContent='';
   document.getElementById('stkSubBtn').textContent=s?'수정하기':'저장하기';
   selectBuyCur(s?.buyCurrency||'KRW');
+  // Group chips
+  selGroupId=s?.groupId||preGroupId||null;
+  const cr=document.getElementById('groupChipRow'); cr.innerHTML='';
+  [{id:null,name:'그룹 없음'},...groups].forEach(g=>{
+    const chip=document.createElement('button');
+    chip.className='chip'+(selGroupId===g.id?' sel':'');
+    chip.textContent=g.name;
+    chip.onclick=()=>{selGroupId=g.id;document.querySelectorAll('#groupChipRow .chip').forEach(c=>c.classList.toggle('sel',c.textContent===g.name))};
+    cr.appendChild(chip);
+  });
   openOv('stockOverlay');
 }
 
@@ -1276,8 +1453,8 @@ async function submitStock(){
   const updatedAt=cur?`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} 기준`:null;
   if(editingStockId){
     const idx=portfolio.findIndex(p=>p.id===editingStockId);
-    portfolio[idx]={...portfolio[idx],name,ticker,qty,buy,buyCurrency:selBuyCur,cur:cur??portfolio[idx].cur,updatedAt:updatedAt??portfolio[idx].updatedAt};
-  }else{portfolio.push({id:Date.now(),name,ticker,qty,buy,buyCurrency:selBuyCur,cur,updatedAt})}
+    portfolio[idx]={...portfolio[idx],name,ticker,qty,buy,buyCurrency:selBuyCur,groupId:selGroupId,cur:cur??portfolio[idx].cur,updatedAt:updatedAt??portfolio[idx].updatedAt};
+  }else{portfolio.push({id:Date.now(),name,ticker,qty,buy,buyCurrency:selBuyCur,groupId:selGroupId,cur,updatedAt})}
   ss('port',portfolio);btn.disabled=false;btn.textContent='저장하기';
   closeOv('stockOverlay');renderPortfolio();
 }
