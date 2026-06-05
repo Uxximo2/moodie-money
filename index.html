@@ -335,6 +335,34 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
 .new-group-card:active{background:var(--bg)}
 .edit-stock-btn{background:var(--bg);border:0.5px solid var(--sep);border-radius:6px;
   padding:3px 8px;font-size:11px;color:var(--label);cursor:pointer;font-family:inherit;white-space:nowrap}
+
+/* MEDICINE CALENDAR */
+.med-day{background:var(--bg);border-radius:10px;padding:5px 3px;min-height:58px;
+  display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:background .1s}
+.med-day:active{background:var(--sep)}
+.med-day.empty{background:transparent;pointer-events:none}
+.med-status{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:700;margin-top:3px}
+.med-taken{background:#34C75920;color:var(--green)}
+.med-skipped{background:#FF3B3020;color:var(--red)}
+.med-none{background:var(--sep)}
+
+/* NOTIFICATION SETTINGS */
+.notif-row{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--sep)}
+.notif-row:last-child{border-bottom:none}
+.notif-label{font-size:15px;font-weight:500}
+.notif-sub{font-size:12px;color:var(--label);margin-top:2px}
+.time-input{background:var(--bg);border:none;border-radius:8px;padding:8px 12px;
+  font-size:15px;font-family:inherit;color:var(--text);outline:none;width:110px;text-align:center}
+.time-input:focus{box-shadow:0 0 0 2px rgba(0,122,255,.2)}
+.toggle-switch{width:50px;height:28px;background:var(--sep);border-radius:14px;
+  position:relative;cursor:pointer;transition:background .2s;border:none;flex-shrink:0}
+.toggle-switch.on{background:var(--green)}
+.toggle-switch::after{content:'';position:absolute;width:22px;height:22px;background:#fff;
+  border-radius:50%;top:3px;left:3px;transition:transform .2s;
+  box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-switch.on::after{transform:translateX(22px)}
 </style>
 </head>
 <body>
@@ -416,6 +444,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
   <div class="bottom-pad"></div>
 </div>
 
+<!-- ══════════ PAGE: 약 ══════════ -->
+<div class="page" id="page-med">
+  <div style="padding:20px 20px 8px;display:flex;align-items:center;justify-content:space-between">
+    <div style="font-size:28px;font-weight:700">💊 약 복용</div>
+    <button class="add-btn" onclick="openMedSettings()">⏰ 알림</button>
+  </div>
+  <div style="margin:0 16px 12px;background:var(--card);border-radius:var(--r);padding:14px 16px;display:flex;gap:16px;box-shadow:0 1px 4px rgba(0,0,0,.07)">
+    <div style="display:flex;align-items:center;gap:6px"><div style="width:20px;height:20px;background:#34C75920;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green)">O</div><span style="font-size:13px">복용</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><div style="width:20px;height:20px;background:#FF3B3020;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--red)">X</div><span style="font-size:13px">미복용</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><div style="width:20px;height:20px;background:var(--sep);border-radius:50%"></div><span style="font-size:13px">기록없음</span></div>
+  </div>
+  <div style="display:flex;justify-content:center;gap:16px;margin-bottom:8px">
+    <button class="month-nav" onclick="changeMedMonth(-1)" style="background:var(--card);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;color:var(--blue);box-shadow:0 1px 4px rgba(0,0,0,.12)">‹</button>
+    <span style="font-size:18px;font-weight:700" id="medMonthLabel"></span>
+    <button onclick="changeMedMonth(1)" style="background:var(--card);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;color:var(--blue);box-shadow:0 1px 4px rgba(0,0,0,.12)">›</button>
+  </div>
+  <div class="cal-grid" id="medCalGrid"></div>
+  <div class="bottom-pad"></div>
+</div>
+
 <!-- ══════════ PAGE: 설정 ══════════ -->
 <div class="page" id="page-settings">
   <div style="padding:20px 20px 6px"><div style="font-size:28px;font-weight:700">⚙️ 설정</div></div>
@@ -430,9 +478,57 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
   <button class="tab-btn" id="tab-port" onclick="switchPage('port')">
     <span class="t-icon">📈</span><span class="t-label">포트폴리오</span>
   </button>
+  <button class="tab-btn" id="tab-med" onclick="switchPage('med')">
+    <span class="t-icon">💊</span><span class="t-label">약</span>
+  </button>
   <button class="tab-btn" id="tab-settings" onclick="switchPage('settings')">
     <span class="t-icon">⚙️</span><span class="t-label">설정</span>
   </button>
+</div>
+
+<!-- ── NOTIFICATION SETTINGS MODAL ── -->
+<div class="overlay" id="notifOv" onclick="bgClose(event,'notifOv')">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-left"><span class="modal-icon-big">🔔</span><span class="modal-title">알림 설정</span></div>
+      <button class="x-btn" onclick="closeOv('notifOv')">✕</button>
+    </div>
+    <div style="padding:0 0 8px">
+      <div style="padding:10px 16px 4px;font-size:12px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.4px">가계부 리마인더</div>
+      <div style="background:var(--card);margin:0 16px;border-radius:var(--r);overflow:hidden">
+        <div class="notif-row">
+          <div><div class="notif-label">가계부 작성 알림</div><div class="notif-sub">매일 설정 시간에 알림</div></div>
+          <button class="toggle-switch" id="budgetNotifToggle" onclick="toggleNotif('budget')"></button>
+        </div>
+        <div class="notif-row">
+          <div class="notif-label">알림 시간</div>
+          <input class="time-input" type="time" id="budgetNotifTime" value="21:00" onchange="saveNotifTime('budget')">
+        </div>
+      </div>
+      <div style="padding:14px 16px 4px;font-size:12px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.4px">약 복용 알림</div>
+      <div style="background:var(--card);margin:0 16px;border-radius:var(--r);overflow:hidden">
+        <div class="notif-row">
+          <div><div class="notif-label">약 복용 알림</div><div class="notif-sub">매일 설정 시간에 알림</div></div>
+          <button class="toggle-switch" id="medNotifToggle" onclick="toggleNotif('med')"></button>
+        </div>
+        <div class="notif-row">
+          <div class="notif-label">알림 시간</div>
+          <input class="time-input" type="time" id="medNotifTime" value="08:00" onchange="saveNotifTime('med')">
+        </div>
+      </div>
+      <div style="padding:14px 16px 4px;font-size:12px;font-weight:600;color:var(--label);text-transform:uppercase;letter-spacing:.4px">주식 알림</div>
+      <div style="background:var(--card);margin:0 16px;border-radius:var(--r);overflow:hidden">
+        <div class="notif-row">
+          <div><div class="notif-label">주가 급등락 알림</div><div class="notif-sub">±10% 이상 변동 시</div></div>
+          <button class="toggle-switch" id="stockNotifToggle" onclick="toggleNotif('stock')"></button>
+        </div>
+      </div>
+      <div style="padding:12px 16px 4px">
+        <button class="sub-btn" onclick="requestNotifPermission()">알림 권한 허용</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ── CARD DETAIL MODAL ── -->
@@ -630,6 +726,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
       <label class="f-label">매입 단가</label>
       <input class="f-input" id="stkBuy" type="number" placeholder="0" inputmode="decimal">
       <div id="stkPriceStatus" style="font-size:13px;color:var(--label);margin-top:10px;min-height:18px;text-align:center"></div>
+      <label class="f-label">현재가 직접 입력 <span style="font-size:11px;color:var(--label);text-transform:none;letter-spacing:0">(티커 조회 실패 시)</span></label>
+      <input class="f-input" id="stkManualCur" type="number" placeholder="비워두면 자동 조회" inputmode="decimal">
       <button class="sub-btn" id="stkSubBtn" onclick="submitStock()">저장하기</button>
     </div>
   </div>
@@ -827,6 +925,7 @@ function switchPage(p){
   document.getElementById('topNav').style.display=p==='home'?'':'none';
   if(p==='home') render();
   if(p==='port'){renderPortfolio();renderWatchlist();refreshMarket();refreshAllPrices();}
+  if(p==='med') renderMedCalendar();
   if(p==='settings') renderSettings();
 }
 
@@ -1295,12 +1394,15 @@ function renderPortfolio(){
     const defaultCur=stocks[0]?.buyCurrency||'USD';
     if(!groupCurrencies[gid]) groupCurrencies[gid]=defaultCur;
     const gc=groupCurrencies[gid];
-    const gCost=stocks.reduce((s,p)=>s+p.qty*p.buy,0);
-    const gVal =stocks.reduce((s,p)=>s+p.qty*(p.cur||p.buy),0);
-    const gGain=gVal-gCost;
-    const gPct =gCost>0?(gGain/gCost*100):0;
-    const gc2=gGain>=0?'#34C759':'#FF3B30';
-    const gStr=(gGain>=0?'+':'')+fmtNative(Math.abs(gGain),gc);
+    // Convert all to KRW for aggregation, then convert to display currency
+    const toKRWv=(amt,cur)=>cur==='USD'?amt*fxRate:amt;
+    const gCostKRW=stocks.reduce((s,p)=>s+toKRWv(p.qty*p.buy,p.buyCurrency||'KRW'),0);
+    const gValKRW =stocks.reduce((s,p)=>s+toKRWv(p.qty*(p.cur||p.buy),p.buyCurrency||'KRW'),0);
+    const gGainKRW=gValKRW-gCostKRW;
+    const gPct=gCostKRW>0?(gGainKRW/gCostKRW*100):0;
+    const gGainDisp=gc==='USD'?gGainKRW/fxRate:gGainKRW;
+    const gc2=gGainKRW>=0?'#34C759':'#FF3B30';
+    const gStr=(gGainDisp>=0?'+':'')+fmtNative(Math.abs(gGainDisp),gc);
     const hdr=document.createElement('div');
     hdr.className='group-hdr';
     hdr.innerHTML=`
@@ -1384,6 +1486,8 @@ async function refreshAllPrices(){
     if(!p.ticker)continue;
     const price=await fetchPrice(p.ticker);
     if(price!==null){
+      checkStockAlerts(p, price);
+      p.prevDayClose=p.cur||p.buy;
       p.cur=price;
       const now=new Date();
       p.updatedAt=`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} 기준`;
@@ -1573,6 +1677,13 @@ function renderSettings(){
           <div class="profile-sub">내 계정으로 로그인됨</div>
         </div>
         <button class="logout-btn" onclick="logout()">로그아웃</button>
+      </div>
+      <span class="settings-hdr-label">알림</span>
+      <div class="settings-section" style="margin-bottom:0">
+        <div class="settings-row" onclick="openNotifSettings()">
+          <div class="sr-left"><div class="sr-icon" style="background:#FFF0E0">🔔</div><div class="sr-text">알림 설정</div></div>
+          <span class="sr-arrow">›</span>
+        </div>
       </div>
       <span class="settings-hdr-label">카테고리 편집</span>
       <div class="settings-section">
@@ -1779,6 +1890,147 @@ function openCardDetail(card){
 function openOv(id){document.getElementById(id).classList.add('open')}
 function closeOv(id){document.getElementById(id).classList.remove('open')}
 function bgClose(e,id){if(e.target===document.getElementById(id))closeOv(id)}
+
+// ═══════════════════════════════════════════
+// MEDICINE
+// ═══════════════════════════════════════════
+let medYear=new Date().getFullYear(), medMonth=new Date().getMonth();
+let medicines=JSON.parse(localStorage.getItem('mm_med')||'{}');
+
+function saveMed(){localStorage.setItem('mm_med',JSON.stringify(medicines));}
+
+function changeMedMonth(d){
+  medMonth+=d;
+  if(medMonth>11){medMonth=0;medYear++;}
+  if(medMonth<0){medMonth=11;medYear--;}
+  renderMedCalendar();
+}
+
+function renderMedCalendar(){
+  const MO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('medMonthLabel').textContent=`${medYear}년 ${MO[medMonth]}`;
+  const grid=document.getElementById('medCalGrid');
+  grid.innerHTML='';
+  const DOWS=['일','월','화','수','목','금','토'];
+  DOWS.forEach((d,i)=>{
+    const el=document.createElement('div');
+    el.className='cal-dow';
+    el.style.color=i===0?'var(--red)':i===6?'var(--blue)':'var(--label)';
+    el.textContent=d; grid.appendChild(el);
+  });
+  const firstDay=new Date(medYear,medMonth,1).getDay();
+  const daysInMonth=new Date(medYear,medMonth+1,0).getDate();
+  const today=new Date();
+  for(let i=0;i<firstDay;i++){
+    const el=document.createElement('div');el.className='cal-day empty';grid.appendChild(el);
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    const dow=(firstDay+d-1)%7;
+    const key=`${medYear}-${String(medMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const status=medicines[key]||'none';
+    const isToday=today.getFullYear()===medYear&&today.getMonth()===medMonth&&today.getDate()===d;
+    const el=document.createElement('div');
+    el.className='cal-day med-day'+(isToday?' today':'');
+    const numClass='cal-num'+(dow===0?' sun':dow===6?' sat':'');
+    let statusHTML='<div class="med-status med-none"></div>';
+    if(status==='taken') statusHTML='<div class="med-status med-taken">O</div>';
+    if(status==='skipped') statusHTML='<div class="med-status med-skipped">X</div>';
+    el.innerHTML=`<span class="${numClass}">${d}</span>${statusHTML}`;
+    el.onclick=()=>cycleMedStatus(key);
+    grid.appendChild(el);
+  }
+}
+
+function cycleMedStatus(key){
+  const cur=medicines[key]||'none';
+  const next={none:'taken',taken:'skipped',skipped:'none'};
+  if(next[cur]==='none') delete medicines[key];
+  else medicines[key]=next[cur];
+  saveMed();
+  renderMedCalendar();
+}
+
+function openMedSettings(){ openNotifSettings(); }
+
+// ═══════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════
+function notifEnabled(type){return localStorage.getItem(`notif_${type}_on`)==='1'}
+function setNotifEnabled(type,val){localStorage.setItem(`notif_${type}_on`,val?'1':'0')}
+function notifTime(type){return localStorage.getItem(`notif_${type}_time`)||{budget:'21:00',med:'08:00'}[type]||'09:00'}
+
+async function requestNotifPermission(){
+  if(!('Notification' in window)){alert('이 브라우저는 알림을 지원하지 않아요');return;}
+  const p=await Notification.requestPermission();
+  if(p==='granted'){alert('알림이 허용됐어요! ✅');}
+  else{alert('알림 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.');}
+}
+
+function sendNotif(title,body){
+  if(Notification.permission!=='granted')return;
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.ready.then(reg=>{
+      reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png'});
+    }).catch(()=>new Notification(title,{body,icon:'/icon-192.png'}));
+  } else {
+    new Notification(title,{body,icon:'/icon-192.png'});
+  }
+}
+
+function toggleNotif(type){
+  const newVal=!notifEnabled(type);
+  setNotifEnabled(type,newVal);
+  const btn=document.getElementById(`${type}NotifToggle`);
+  if(btn) btn.classList.toggle('on',newVal);
+  if(newVal && Notification.permission!=='granted') requestNotifPermission();
+}
+
+function saveNotifTime(type){
+  const val=document.getElementById(`${type}NotifTime`)?.value;
+  if(val) localStorage.setItem(`notif_${type}_time`,val);
+}
+
+function openNotifSettings(){
+  // Sync toggle states
+  ['budget','med','stock'].forEach(t=>{
+    const btn=document.getElementById(`${t}NotifToggle`);
+    if(btn) btn.classList.toggle('on',notifEnabled(t));
+  });
+  const bt=document.getElementById('budgetNotifTime');
+  const mt=document.getElementById('medNotifTime');
+  if(bt) bt.value=notifTime('budget');
+  if(mt) mt.value=notifTime('med');
+  openOv('notifOv');
+}
+
+// Check every minute if a notification should fire
+function checkScheduledNotifs(){
+  if(Notification.permission!=='granted') return;
+  const now=new Date();
+  const hm=`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  const today=now.toDateString();
+  if(notifEnabled('budget')&&notifTime('budget')===hm){
+    const last=localStorage.getItem('notif_budget_last');
+    if(last!==today){sendNotif('💰 가계부','오늘 가계부 작성하셨나요?');localStorage.setItem('notif_budget_last',today);}
+  }
+  if(notifEnabled('med')&&notifTime('med')===hm){
+    const last=localStorage.getItem('notif_med_last');
+    if(last!==today){sendNotif('💊 약 복용 시간','오늘 약 드셨나요? 앱을 열어 기록해보세요.');localStorage.setItem('notif_med_last',today);}
+  }
+}
+setInterval(checkScheduledNotifs, 30000);
+
+// Check stock price change ≥ 10%
+function checkStockAlerts(p, newPrice){
+  if(!notifEnabled('stock')) return;
+  const prev=p.prevDayClose||p.buy;
+  if(!prev||!newPrice) return;
+  const chg=(newPrice-prev)/prev*100;
+  if(Math.abs(chg)>=10){
+    const dir=chg>0?'상승':'하락';
+    sendNotif('📈 주식 알림',`${p.name}이(가) ${Math.abs(chg).toFixed(1)}% ${dir}했어요!`);
+  }
+}
 
 // ═══════════════════════════════════════════
 // INIT
