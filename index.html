@@ -668,6 +668,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
   </div>
 </div>
 
+<!-- ── CARD EDITOR MODAL ── -->
+<div class="overlay" id="cardEditorOv" onclick="bgClose(event,'cardEditorOv')">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-left"><span class="modal-icon-big">💳</span><span class="modal-title">카드 편집</span></div>
+      <button class="x-btn" onclick="closeOv('cardEditorOv')">✕</button>
+    </div>
+    <div style="padding:4px 20px 0;font-size:13px;color:var(--label)">✕를 눌러 삭제, 아래에서 새 카드 추가</div>
+    <div class="cat-edit-list" id="cardEditList"></div>
+    <div class="add-cat-row">
+      <input class="add-cat-inp" id="newCardName" placeholder="새 카드 이름 (예: KB, 신한)">
+      <button class="add-cat-confirm" onclick="addCard()">추가</button>
+    </div>
+    <div style="height:16px"></div>
+  </div>
+</div>
+
 <!-- ── NEW GROUP MODAL ── -->
 <div class="overlay" id="newGroupOv" onclick="bgClose(event,'newGroupOv')">
   <div class="sheet">
@@ -783,7 +801,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
 // ═══════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════
-const CARDS=['NH','Toss','Hana','Hyundai','Iron BCC','계좌이체'];
+const DEF_CARDS=['NH','Toss','Hana','Hyundai','Iron BCC','계좌이체'];
+let CARDS=JSON.parse(localStorage.getItem('mm_cards')||JSON.stringify(DEF_CARDS));
+function saveCards(){localStorage.setItem('mm_cards',JSON.stringify(CARDS));}
 const EMOJIS=['💰','💼','✨','🍚','☕','🎬','🚇','💊','🛒','🏪','📱','🍺','💈','👕','🎁','🎮','✈️','🏦',
   '🎵','🐾','🍕','🍜','🧴','💄','📚','🏋️','⚽','🎯','🎪','💻','🚗','🏠','💡','🔧','🎨','🌿','🍎','🧸'];
 const DEF_INCOME=[{key:'용돈',icon:'💰'},{key:'알바',icon:'💼'},{key:'기타',icon:'✨'}];
@@ -1695,6 +1715,10 @@ function renderSettings(){
           <div class="sr-left"><div class="sr-icon" style="background:#FFF0EF">📤</div><div class="sr-text">지출 카테고리 편집</div></div>
           <span class="sr-arrow">›</span>
         </div>
+        <div class="settings-row" onclick="openCardEditor()">
+          <div class="sr-left"><div class="sr-icon" style="background:#E8F1FF">💳</div><div class="sr-text">카드 편집</div></div>
+          <span class="sr-arrow">›</span>
+        </div>
       </div>
       <span class="settings-hdr-label">데이터 관리</span>
       <div class="settings-section">
@@ -1890,6 +1914,34 @@ function openCardDetail(card){
 function openOv(id){document.getElementById(id).classList.add('open')}
 function closeOv(id){document.getElementById(id).classList.remove('open')}
 function bgClose(e,id){if(e.target===document.getElementById(id))closeOv(id)}
+
+// ═══════════════════════════════════════════
+// CARD EDITOR
+// ═══════════════════════════════════════════
+function openCardEditor(){
+  renderCardEditorList();
+  openOv('cardEditorOv');
+}
+function renderCardEditorList(){
+  const el=document.getElementById('cardEditList'); el.innerHTML='';
+  CARDS.forEach((card,i)=>{
+    const row=document.createElement('div'); row.className='cat-edit-item';
+    row.innerHTML=`<span style="font-size:15px;flex:1;padding:4px 0">💳 ${card}</span>
+      <button class="cat-del-btn" onclick="deleteCard(${i})">✕</button>`;
+    el.appendChild(row);
+  });
+}
+function deleteCard(i){
+  CARDS.splice(i,1); saveCards(); renderCardEditorList();
+  render(); // refresh card summary chips
+}
+function addCard(){
+  const name=document.getElementById('newCardName').value.trim();
+  if(!name||CARDS.includes(name))return;
+  CARDS.push(name); saveCards();
+  document.getElementById('newCardName').value='';
+  renderCardEditorList(); render();
+}
 
 // ═══════════════════════════════════════════
 // MEDICINE
