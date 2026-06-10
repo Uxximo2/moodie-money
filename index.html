@@ -412,7 +412,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Ne
     <div class="cat-grid" id="gridExpense"></div>
   </div>
 
-  <div style="display:flex;justify-content:space-between;align-items:baseline;padding:18px 20px 10px">
+  <!-- SPEND CHART -->
+  <div id="spendChart" style="margin:16px 16px 0"></div>
+
+  <div style="display:flex;justify-content:space-between;align-items:baseline;padding:16px 20px 10px">
     <span style="font-size:20px;font-weight:700">최근 내역</span>
   </div>
   <div class="tx-list" id="txList"></div>
@@ -1021,6 +1024,7 @@ function render(){
   renderGrid('gridIncome',incCats,true);
   renderGrid('gridExpense',expCats,false);
   renderCardSummary();
+  renderSpendChart();
   const txDate=t=>{const[y,m]=t.monthKey.split('-');const d=t.date.split('/')[1];return new Date(parseInt(y),parseInt(m)-1,parseInt(d));};
   renderTxList([...txs].sort((a,b)=>txDate(b)-txDate(a)).slice(0,40));
 }
@@ -1915,6 +1919,77 @@ function openCardDetail(card){
 function openOv(id){document.getElementById(id).classList.add('open')}
 function closeOv(id){document.getElementById(id).classList.remove('open')}
 function bgClose(e,id){if(e.target===document.getElementById(id))closeOv(id)}
+
+// ═══════════════════════════════════════════
+// SPEND CHART
+// ═══════════════════════════════════════════
+const BAR_COLORS=['#FF6B6B','#FF9F43','#FECA57','#48DBFB','#FF9FF3','#54A0FF','#5F27CD','#00D2D3','#1DD1A1','#C8D6E5'];
+
+function renderSpendChart(){
+  const el=document.getElementById('spendChart');
+  const txs=mTxs().filter(t=>!t.isInc);
+  if(!txs.length){el.innerHTML='';return;}
+
+  // Aggregate by category
+  const totals={};
+  txs.forEach(t=>{
+    totals[t.cat]=(totals[t.cat]||0)+t.amount;
+  });
+  const sorted=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  if(!sorted.length){el.innerHTML='';return;}
+  const max=sorted[0][1];
+  const totalExp=sorted.reduce((s,[,v])=>s+v,0);
+
+  let html=`<div style="background:var(--card);border-radius:var(--r);padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.07)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:14px">📊 이번 달 지출 분석</div>`;
+
+  // Donut chart using SVG
+  const size=120, r=44, cx=60, cy=60, circ=2*Math.PI*r;
+  let svgParts='', offset=0;
+  sorted.forEach(([cat,amt],i)=>{
+    const pct=amt/totalExp;
+    const dash=pct*circ;
+    const gap=circ-dash;
+    svgParts+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${BAR_COLORS[i%BAR_COLORS.length]}" stroke-width="16"
+      stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offset*circ).toFixed(2)}"
+      transform="rotate(-90 ${cx} ${cy})" style="transition:stroke-dasharray .3s"/>`;
+    offset+=pct;
+  });
+  const topCat=[...incCats,...expCats].find(c=>c.key===sorted[0][0]);
+  const topIcon=topCat?.icon||'💸';
+
+  html+=`<div style="display:flex;gap:16px;align-items:center">
+    <div style="flex-shrink:0;position:relative;width:${size}px;height:${size}px">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--sep)" stroke-width="16"/>
+        ${svgParts}
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <span style="font-size:22px">${topIcon}</span>
+        <span style="font-size:10px;color:var(--label);margin-top:2px">${sorted[0][0]}</span>
+      </div>
+    </div>
+    <div style="flex:1;min-width:0">`;
+
+  sorted.forEach(([cat,amt],i)=>{
+    const catObj=[...incCats,...expCats].find(c=>c.key===cat);
+    const icon=catObj?.icon||'📌';
+    const pct=Math.round(amt/totalExp*100);
+    const barW=Math.round(amt/max*100);
+    html+=`<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:12px;font-weight:600">${icon} ${cat}</span>
+        <span style="font-size:11px;color:var(--label)">${pct}% · ${fmt(amt)}</span>
+      </div>
+      <div style="background:var(--sep);border-radius:4px;height:6px;overflow:hidden">
+        <div style="width:${barW}%;height:100%;background:${BAR_COLORS[i%BAR_COLORS.length]};border-radius:4px;transition:width .4s"></div>
+      </div>
+    </div>`;
+  });
+
+  html+='</div></div></div>';
+  el.innerHTML=html;
+}
 
 // ═══════════════════════════════════════════
 // CARD EDITOR
