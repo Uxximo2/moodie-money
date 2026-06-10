@@ -1021,7 +1021,8 @@ function render(){
   renderGrid('gridIncome',incCats,true);
   renderGrid('gridExpense',expCats,false);
   renderCardSummary();
-  renderTxList([...txs].reverse().slice(0,40));
+  const txDate=t=>{const[y,m]=t.monthKey.split('-');const d=t.date.split('/')[1];return new Date(parseInt(y),parseInt(m)-1,parseInt(d));};
+  renderTxList([...txs].sort((a,b)=>txDate(b)-txDate(a)).slice(0,40));
 }
 
 function renderGrid(id,cats,isInc){
