@@ -867,10 +867,41 @@ function listenToUserData(uid){
       loadLocalData();
       saveToFirestore();
     }
+    recoverLegacyGuestData();
     render();
     if(curPage==='port'){renderPortfolio();renderWatchlist();}
     if(curPage==='settings') renderSettings();
   });
+}
+
+// One-time recovery: data entered before the user ever signed up was saved
+// under un-suffixed keys (mm_tx etc). Signing in switches to a per-user key
+// (mm_tx_<user>), stranding that old data. Pull it in wherever it's found,
+// then clear the legacy keys so this only ever runs once per browser.
+function recoverLegacyGuestData(){
+  const legacyKeys={tx:'mm_tx',port:'mm_port',watch:'mm_watch',inc:'mm_inc',exp:'mm_exp',groups:'mm_groups'};
+  const found={};
+  let any=false;
+  for(const[prop,key]of Object.entries(legacyKeys)){
+    const raw=localStorage.getItem(key);
+    if(!raw) continue;
+    try{
+      const val=JSON.parse(raw);
+      if(Array.isArray(val)&&val.length>0){found[prop]=val;any=true;}
+    }catch{}
+  }
+  if(!any) return;
+  const mergeCats=(cur,old)=>{const keys=new Set(cur.map(c=>c.key));return[...cur,...old.filter(c=>!keys.has(c.key))]};
+  if(found.tx)     transactions=[...found.tx,...transactions];
+  if(found.port)   portfolio   =[...found.port,...portfolio];
+  if(found.watch)  watchlist   =[...found.watch,...watchlist];
+  if(found.groups) groups      =[...found.groups,...groups];
+  if(found.inc)    incCats     =mergeCats(incCats,found.inc);
+  if(found.exp)    expCats     =mergeCats(expCats,found.exp);
+  ss('tx',transactions);ss('port',portfolio);ss('watch',watchlist);
+  ss('inc',incCats);ss('exp',expCats);ss('groups',groups);
+  Object.values(legacyKeys).forEach(k=>localStorage.removeItem(k));
+  alert(`로그인 전에 입력했던 데이터를 복구했어요! (거래 ${found.tx?found.tx.length:0}건)`);
 }
 
 async function saveToFirestore(){
