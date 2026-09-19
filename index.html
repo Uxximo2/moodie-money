@@ -15,10 +15,6 @@
 <meta name="apple-mobile-web-app-title" content="아껴쓰자">
 <link rel="apple-touch-icon" href="/icon-192.png">
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
 <style>
@@ -822,121 +818,23 @@ const EXP_COLORS=['#FF3B3018','#FF950018','#34C75918','#007AFF18','#30D15818',
   '#0071E318','#FF3A5C18','#32ADE618','#5E5CE618','#30B0C718'];
 
 // ═══════════════════════════════════════════
-// FIREBASE
+// STORAGE (browser localStorage only — no accounts, no cloud)
 // ═══════════════════════════════════════════
-let db=null,fbAuth=null,currentUID=null,_unsubData=null,_saveTimer=null;
+const DATA_KEYS=['tx','port','watch','inc','exp','groups'];
+function ls(k,def){try{const v=localStorage.getItem('mm_'+k);return v?JSON.parse(v):def}catch{return def}}
+function ss(k,v){localStorage.setItem('mm_'+k,JSON.stringify(v));}
 
-async function initFirebase(){
-  try{
-    const r=await fetch('/api/config');
-    const cfg=await r.json();
-    if(!cfg.apiKey) throw new Error('no config');
-    firebase.initializeApp(cfg);
-    fbAuth=firebase.auth();
-    db=firebase.firestore();
-    fbAuth.onAuthStateChanged(user=>{
-      if(user){
-        currentUID=user.uid;
-        listenToUserData(user.uid);
-      } else {
-        currentUID=null;
-        if(_unsubData){_unsubData();_unsubData=null;}
-        loadLocalData();
-        render();
-        if(curPage==='settings') renderSettings();
-      }
-    });
-  } catch(e){
-    console.log('Firebase fallback:',e.message);
-    loadLocalData(); render();
-  }
-}
-
-function listenToUserData(uid){
-  if(_unsubData) _unsubData();
-  _unsubData=db.collection('users').doc(uid).onSnapshot(doc=>{
-    if(doc.exists){
-      const d=doc.data();
-      transactions=d.transactions||[];
-      portfolio   =d.portfolio||[];
-      watchlist   =d.watchlist||[];
-      incCats     =d.incCats||JSON.parse(JSON.stringify(DEF_INCOME));
-      expCats     =d.expCats||JSON.parse(JSON.stringify(DEF_EXPENSE));
-      groups      =d.groups||[];
-    } else {
-      loadLocalData();
-      saveToFirestore();
-    }
-    recoverLegacyGuestData();
-    render();
-    if(curPage==='port'){renderPortfolio();renderWatchlist();}
-    if(curPage==='settings') renderSettings();
-  });
-}
-
-// One-time recovery: data entered before the user ever signed up was saved
-// under un-suffixed keys (mm_tx etc). Signing in switches to a per-user key
-// (mm_tx_<user>), stranding that old data. Pull it in wherever it's found,
-// then clear the legacy keys so this only ever runs once per browser.
-function recoverLegacyGuestData(){
-  const legacyKeys={tx:'mm_tx',port:'mm_port',watch:'mm_watch',inc:'mm_inc',exp:'mm_exp',groups:'mm_groups'};
-  const found={};
-  let any=false;
-  for(const[prop,key]of Object.entries(legacyKeys)){
-    const raw=localStorage.getItem(key);
-    if(!raw) continue;
+// Older versions saved to mm_<key>_<username>. If the plain key is empty, copy
+// the fullest old one over it. Old keys are never deleted.
+function adoptOldUserKeys(){
+  for(const k of DATA_KEYS){
     try{
-      const val=JSON.parse(raw);
-      if(Array.isArray(val)&&val.length>0){found[prop]=val;any=true;}
+      if(JSON.parse(localStorage.getItem('mm_'+k)||'[]').length) continue;
+      const best=Object.keys(localStorage).filter(x=>x.startsWith(`mm_${k}_`))
+        .sort((a,b)=>localStorage.getItem(b).length-localStorage.getItem(a).length)[0];
+      if(best&&JSON.parse(localStorage.getItem(best)).length) localStorage.setItem('mm_'+k,localStorage.getItem(best));
     }catch{}
   }
-  if(!any) return;
-  const mergeCats=(cur,old)=>{const keys=new Set(cur.map(c=>c.key));return[...cur,...old.filter(c=>!keys.has(c.key))]};
-  if(found.tx)     transactions=[...found.tx,...transactions];
-  if(found.port)   portfolio   =[...found.port,...portfolio];
-  if(found.watch)  watchlist   =[...found.watch,...watchlist];
-  if(found.groups) groups      =[...found.groups,...groups];
-  if(found.inc)    incCats     =mergeCats(incCats,found.inc);
-  if(found.exp)    expCats     =mergeCats(expCats,found.exp);
-  ss('tx',transactions);ss('port',portfolio);ss('watch',watchlist);
-  ss('inc',incCats);ss('exp',expCats);ss('groups',groups);
-  Object.values(legacyKeys).forEach(k=>localStorage.removeItem(k));
-  alert(`로그인 전에 입력했던 데이터를 복구했어요! (거래 ${found.tx?found.tx.length:0}건)`);
-}
-
-async function saveToFirestore(){
-  if(!db||!currentUID) return;
-  try{
-    await db.collection('users').doc(currentUID).set({
-      transactions,portfolio,watchlist,incCats,expCats,groups,
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-  } catch(e){console.error('Firestore save:',e);}
-}
-
-function scheduleSave(){
-  clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(saveToFirestore,600);
-}
-
-// ═══════════════════════════════════════════
-// USER / AUTH
-// ═══════════════════════════════════════════
-function getCurrentUser(){
-  if(fbAuth?.currentUser) return fbAuth.currentUser.email.replace('@akkeuseuja.app','');
-  return localStorage.getItem('mm_currentUser')||null;
-}
-function setCurrentUser(u){u?localStorage.setItem('mm_currentUser',u):localStorage.removeItem('mm_currentUser')}
-function hashPw(s){let h=0;for(let i=0;i<s.length;i++){h=(Math.imul(31,h)+s.charCodeAt(i))|0}return h.toString(36)}
-function uKey(k){const u=getCurrentUser();return u?`mm_${k}_${u}`:`mm_${k}`}
-
-// ═══════════════════════════════════════════
-// STORAGE
-// ═══════════════════════════════════════════
-function ls(k,def){try{const v=localStorage.getItem(uKey(k));return v?JSON.parse(v):def}catch{return def}}
-function ss(k,v){
-  localStorage.setItem(uKey(k),JSON.stringify(v));
-  if(db&&currentUID) scheduleSave();
 }
 
 let transactions,portfolio,watchlist,incCats,expCats,groups;
@@ -948,8 +846,9 @@ function loadLocalData(){
   expCats     =ls('exp',JSON.parse(JSON.stringify(DEF_EXPENSE)));
   groups      =ls('groups',[]);
 }
-function loadUserData(){loadLocalData();}
+adoptOldUserKeys();
 loadLocalData();
+if(navigator.storage&&navigator.storage.persist) navigator.storage.persist();
 
 // ═══════════════════════════════════════════
 // STATE
@@ -1722,17 +1621,10 @@ async function refreshMarket(){
 // SETTINGS
 // ═══════════════════════════════════════════
 function renderSettings(){
-  const user=getCurrentUser();
-  const el=document.getElementById('settingsContent');
-  if(user){
-    el.innerHTML=`
-      <div class="profile-card">
-        <div class="profile-avatar">${user.slice(0,1).toUpperCase()}</div>
-        <div class="profile-info">
-          <div class="profile-name">${user}</div>
-          <div class="profile-sub">내 계정으로 로그인됨</div>
-        </div>
-        <button class="logout-btn" onclick="logout()">로그아웃</button>
+  document.getElementById('settingsContent').innerHTML=`
+      <div class="notice gray" style="margin-top:0">
+        <strong>💾 데이터 저장 안내</strong><br>
+        데이터는 이 기기의 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라지니, 아래에서 주기적으로 내보내기(백업)를 해주세요.
       </div>
       <span class="settings-hdr-label">알림</span>
       <div class="settings-section" style="margin-bottom:0">
@@ -1773,97 +1665,16 @@ function renderSettings(){
       </div>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
       <div class="bottom-pad"></div>`;
-  } else {
-    el.innerHTML=`
-      <div class="login-card">
-        <div class="login-title">👋 환영해요!</div>
-        <div class="login-sub">로그인하면 내 데이터가 계정에 저장돼요</div>
-        <div class="login-tabs">
-          <button class="login-tab active" id="ltLogin" onclick="switchLoginTab('login')">로그인</button>
-          <button class="login-tab" id="ltSignup" onclick="switchLoginTab('signup')">회원가입</button>
-        </div>
-        <div id="loginForm">
-          <label class="f-label">아이디</label>
-          <input class="f-input" id="loginUser" placeholder="아이디 입력" autocomplete="username">
-          <label class="f-label" style="margin-top:12px">비밀번호</label>
-          <input class="f-input" id="loginPw" type="password" placeholder="비밀번호 입력" autocomplete="current-password">
-          <div class="login-err" id="loginErr"></div>
-          <button class="sub-btn" style="margin-top:12px" onclick="doLogin()">로그인</button>
-        </div>
-        <div id="signupForm" style="display:none">
-          <label class="f-label">아이디</label>
-          <input class="f-input" id="signupUser" placeholder="사용할 아이디" autocomplete="username">
-          <label class="f-label" style="margin-top:12px">비밀번호</label>
-          <input class="f-input" id="signupPw" type="password" placeholder="비밀번호 설정" autocomplete="new-password">
-          <div class="login-err" id="signupErr"></div>
-          <button class="sub-btn green" style="margin-top:12px" onclick="doSignup()">가입하기</button>
-        </div>
-      </div>
-      <div class="notice gray" style="margin-top:0">
-        <strong>📱 데이터 저장 안내</strong><br>
-        계정 데이터는 이 브라우저의 localStorage에 저장돼요. 같은 기기·브라우저에서 로그인하면 내 데이터가 그대로 유지돼요. 클라우드 동기화는 추후 앱 버전에서 지원 예정.
-      </div>
-      <div class="bottom-pad"></div>`;
-  }
-}
-
-function switchLoginTab(tab){
-  document.getElementById('ltLogin').classList.toggle('active',tab==='login');
-  document.getElementById('ltSignup').classList.toggle('active',tab==='signup');
-  document.getElementById('loginForm').style.display=tab==='login'?'':'none';
-  document.getElementById('signupForm').style.display=tab==='signup'?'':'none';
-}
-
-async function doLogin(){
-  const user=document.getElementById('loginUser').value.trim();
-  const pw=document.getElementById('loginPw').value;
-  const err=document.getElementById('loginErr');
-  if(!user||!pw){err.textContent='아이디와 비밀번호를 입력해주세요';return}
-  if(fbAuth){
-    try{
-      const email=`${user}@akkeuseuja.app`;
-      await fbAuth.signInWithEmailAndPassword(email,pw);
-      // onAuthStateChanged handles the rest
-    } catch(e){
-      if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential') err.textContent='아이디 또는 비밀번호가 틀렸어요';
-      else if(e.code==='auth/wrong-password') err.textContent='비밀번호가 틀렸어요';
-      else err.textContent='로그인 실패: '+e.message;
-    }
-  }
-}
-
-async function doSignup(){
-  const user=document.getElementById('signupUser').value.trim();
-  const pw=document.getElementById('signupPw').value;
-  const err=document.getElementById('signupErr');
-  if(!user||!pw){err.textContent='아이디와 비밀번호를 입력해주세요';return}
-  if(pw.length<4){err.textContent='비밀번호는 4자 이상이어야 해요';return}
-  if(fbAuth){
-    try{
-      const email=`${user}@akkeuseuja.app`;
-      await fbAuth.createUserWithEmailAndPassword(email,pw);
-      // onAuthStateChanged handles the rest
-    } catch(e){
-      if(e.code==='auth/email-already-in-use') err.textContent='이미 사용중인 아이디예요';
-      else err.textContent='가입 실패: '+e.message;
-    }
-  }
-}
-
-async function logout(){
-  if(!confirm('로그아웃 할까요?'))return;
-  if(fbAuth) await fbAuth.signOut();
-  setCurrentUser(null);loadLocalData();renderSettings();render();
 }
 
 // ═══════════════════════════════════════════
 // DATA MANAGEMENT
 // ═══════════════════════════════════════════
 function exportData(){
-  const data={transactions,portfolio,watchlist,incCats,expCats,user:getCurrentUser(),exported:new Date().toISOString()};
+  const data={transactions,portfolio,watchlist,incCats,expCats,groups,cards:CARDS,medicines,exported:new Date().toISOString()};
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-  a.download=`moodie_money_${getCurrentUser()||'guest'}_${new Date().toISOString().slice(0,10)}.json`;
+  a.download=`moodie_money_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
 }
 
@@ -1879,6 +1690,9 @@ function importData(e){
         if(d.watchlist){watchlist=d.watchlist;ss('watch',watchlist)}
         if(d.incCats){incCats=d.incCats;ss('inc',incCats)}
         if(d.expCats){expCats=d.expCats;ss('exp',expCats)}
+        if(d.groups){groups=d.groups;ss('groups',groups)}
+        if(d.cards){CARDS=d.cards;saveCards()}
+        if(d.medicines){medicines=d.medicines;saveMed()}
         alert('불러오기 완료!');render();
       }
     }catch{alert('올바른 JSON 파일이 아닙니다.')}
@@ -1888,8 +1702,8 @@ function importData(e){
 
 function resetData(){
   if(!confirm('모든 데이터를 삭제할까요?'))return;
-  ['tx','port','watch','inc','exp'].forEach(k=>localStorage.removeItem(uKey(k)));
-  loadUserData();render();alert('초기화 완료');
+  DATA_KEYS.forEach(k=>Object.keys(localStorage).filter(x=>x===`mm_${k}`||x.startsWith(`mm_${k}_`)).forEach(x=>localStorage.removeItem(x)));
+  loadLocalData();render();alert('초기화 완료');
 }
 
 // ═══════════════════════════════════════════
@@ -2195,7 +2009,6 @@ function checkStockAlerts(p, newPrice){
 // INIT
 // ═══════════════════════════════════════════
 render();
-initFirebase();
 
 // Register service worker for PWA
 if('serviceWorker' in navigator){
